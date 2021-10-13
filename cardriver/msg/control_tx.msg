@@ -1,0 +1,10 @@
+int32 aimode
+int32 drive_vector
+int32 drive_throttle
+int32 steer_degree
+int32 steer_raw
+int32 signal
+int32 lamp
+int32 horn
+int32 embed_custom_a
+int32 embed_custom_b

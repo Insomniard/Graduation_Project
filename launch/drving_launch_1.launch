@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+ <!---camera-->
+
+ <node pkg = "Jeong_Graduation" name="camera0" type="TargetCatch.py" args="0 640 360" output="screen"/>
+<!---camera-->
+
+ <!---driving-->
+
+<node pkg = "cardriver" name="gilbot_r1" type="cardrv.py" args="ttyTHS2 gilbot_r1" output="screen"/>
+<node pkg = "Jeong_Graduation" name="control_JJeong" type="driving_run_default.py" output="screen"/>
+ <!---driving-->
+
+ <!---gps-->
+
+ <!-- <node pkg = "ublox_c94_m8p" name="gps_node" type="gps.py" args="ttyACM0 9500" output="screen"/> -->
+<!---gps-->
+
+ <!---lidar-->
+
+  
+ <!-- <node name="rplidarNode"           pkg="rplidar_ros"   type="rplidarNode" output="screen">
+
+ <param name = "serial_port"        type="string" value="/dev/ttyUSB0"/>
+
+ <param name = "serial_baudrate"    type="int"    value="115200"/>
+
+
+ <param name = "frame_id"           type = "string"       value = "laser"/>
+
+ <param name = "inverted"           type = "bool"       value = "false"/>
+
+ <param name = "angle_compensate"           type = "bool"       value = "true"/> -->
+
+ <node pkg = "Jeong_Graduation" name="lidar_scan" type="Class_Lidar_Input.py" output="screen"/> -->
+
+ <!---lidar-->
+
+  <!-- </node> -->
+ 
+
+
+ </launch>
