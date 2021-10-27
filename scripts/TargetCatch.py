@@ -24,8 +24,8 @@ class targetcatch:
         self.cap = cv.VideoCapture(0)
         self.check_point = False
         self.horn_point = False
-        fuckU = threading.Thread(target=self.Controlltarget)
-        fuckU.start()
+        startThread = threading.Thread(target=self.Controlltarget)
+        startThread.start()
 
 
     def get_hander_point(self):
