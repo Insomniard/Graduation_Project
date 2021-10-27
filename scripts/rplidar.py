@@ -1,27 +1,4 @@
-'''Simple and lightweight module for working with RPLidar rangefinder scanners.
 
-Usage example:
-
->>> from rplidar import RPLidar
->>> lidar = RPLidar('/dev/ttyUSB0')
->>> 
->>> info = lidar.get_info()
->>> print(info)
->>> 
->>> health = lidar.get_health()
->>> print(health)
->>> 
->>> for i, scan in enumerate(lidar.iter_scans()):
-...  print('%d: Got %d measurments' % (i, len(scan)))
-...  if i > 10:
-...   break
-...
->>> lidar.stop()
->>> lidar.stop_motor()
->>> lidar.disconnect()
-
-For additional information please refer to the RPLidar class documentation.
-'''
 import logging, sys, time, codecs, serial, struct
 
 import rospy
@@ -91,20 +68,7 @@ class RPLidar(object):
     baudrate = 115200  #: Baudrate for serial port
 
     def __init__(self, port, baudrate=115200, timeout=1, logger=None):
-        '''Initilize RPLidar object for communicating with the sensor.
-
-        Parameters
-        ----------
-        port : str
-            Serial port name to which sensor is connected
-        baudrate : int, optional
-            Baudrate for serial connection (the default is 115200)
-        timeout : float, optional
-            Serial port connection timeout in seconds (the default is 1)
-        logger : logging.Logger instance, optional
-            Logger instance, if none is provided new instance is created
-        '''
-        # rospy.init_node('lidar_bas', anonymous=True)
+      
         self._serial_port = None
         self.port = port
         self.baudrate = baudrate
@@ -144,20 +108,15 @@ class RPLidar(object):
     def start_motor(self):
         '''Starts sensor motor'''
         self.logger.info('Starting motor')
-        # For A1
         self._serial_port.dtr = False
-
-        # For A2
         self.set_pwm(DEFAULT_MOTOR_PWM)
         self.motor_running = True
 
     def stop_motor(self):
         '''Stops sensor motor'''
         self.logger.info('Stoping motor')
-        # For A2
         self.set_pwm(0)
         time.sleep(.001)
-        # For A1
         self._serial_port.dtr = True
         self.motor_running = False
 
@@ -199,13 +158,6 @@ class RPLidar(object):
         return data
 
     def get_info(self):
-        '''Get device information
-
-        Returns
-        -------
-        dict
-            Dictionary with the sensor information
-        '''
         self._send_cmd(GET_INFO_BYTE)
         dsize, is_single, dtype = self._read_descriptor()
         if dsize != INFO_LEN:
@@ -226,20 +178,6 @@ class RPLidar(object):
         return data
 
     def get_health(self):
-        '''Get device health state. When the core system detects some
-        potential risk that may cause hardware failure in the future,
-        the returned status value will be 'Warning'. But sensor can still work
-        as normal. When sensor is in the Protection Stop state, the returned
-        status value will be 'Error'. In case of warning or error statuses
-        non-zero error code will be returned.
-
-        Returns
-        -------
-        status : str
-            'Good', 'Warning' or 'Error' statuses
-        error_code : int
-            The related error code that caused a warning/error.
-        '''
         self._send_cmd(GET_HEALTH_BYTE)
         dsize, is_single, dtype = self._read_descriptor()
         if dsize != HEALTH_LEN:
@@ -254,47 +192,21 @@ class RPLidar(object):
         return status, error_code
 
     def clear_input(self):
-        '''Clears input buffer by reading all available data'''
         self._serial_port.read_all()
 
     def stop(self):
-        '''Stops scanning process, disables laser diode and the measurment
-        system, moves sensor to the idle state.'''
         self.logger.info('Stoping scanning')
         self._send_cmd(STOP_BYTE)
         time.sleep(.001)
         self.clear_input()
 
     def reset(self):
-        '''Resets sensor core, reverting it to a similar state as it has
-        just been powered up.'''
         self.logger.info('Reseting the sensor')
         self._send_cmd(RESET_BYTE)
         time.sleep(.002)
 
     def iter_measurments(self, max_buf_meas=500):
-        '''Iterate over measurments. Note that consumer must be fast enough,
-        otherwise data will be accumulated inside buffer and consumer will get
-        data with increaing lag.
-
-        Parameters
-        ----------
-        max_buf_meas : int
-            Maximum number of measurments to be stored inside the buffer. Once
-            numbe exceeds this limit buffer will be emptied out.
-
-        Yields
-        ------
-        new_scan : bool
-            True if measurment belongs to a new scan
-        quality : int
-            Reflected laser pulse strength
-        angle : float
-            The measurment heading angle in degree unit [0, 360)
-        distance : float
-            Measured object distance related to the sensor's rotation center.
-            In millimeter unit. Set to 0 when measurment is invalid.
-        '''
+        
         self.start_motor()
         status, error_code = self.get_health()
         self.logger.debug('Health status: %s [%d]', status, error_code)
@@ -332,25 +244,7 @@ class RPLidar(object):
             yield _process_scan(raw)
 
     def iter_scans(self, max_buf_meas=500, min_len=5):
-        '''Iterate over scans. Note that consumer must be fast enough,
-        otherwise data will be accumulated inside buffer and consumer will get
-        data with increasing lag.
-
-        Parameters
-        ----------
-        max_buf_meas : int
-            Maximum number of measurments to be stored inside the buffer. Once
-            numbe exceeds this limit buffer will be emptied out.
-        min_len : int
-            Minimum number of measurments in the scan for it to be yelded.
-
-        Yields
-        ------
-        scan : list
-            List of the measurments. Each measurment is tuple with following
-            format: (quality, angle, distance). For values description please
-            refer to `iter_measurments` method's documentation.
-        '''
+        
         scan = []
         iterator = self.iter_measurments(max_buf_meas)
         for new_scan, quality, angle, distance in iterator:
