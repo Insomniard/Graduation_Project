@@ -38,8 +38,6 @@ class ioe_lidar:
                 self.lidar.stop_motor()
                 self.lidar.disconnect()
                 break
-            #print('Deg:%d (%fmm)' % (target_deg, degree_buf[target_deg]))
-        #print('Got %d measurments %s %d' % (len(scan), str(scan), len(scan[1])))
         print("Lidar receive threading terminated.")
 
     def lenth_ret(self, target_degree=0):
@@ -49,45 +47,61 @@ class ioe_lidar:
 
 if __name__ == '__main__':
     
-    sen_Lidar = ioe_lidar("ttyUSB0") #external USB Serial Port
-    # deg =int(sen_Lidar.degree_buf[120])
-    # deg = 351
+    sen_Lidar = ioe_lidar("ttyUSB0")
     temp_list = []
     temp_list_right = []
-    start_degree_left = 330
+    start_degree_left = 331
     end_degree_left = 360
-    start_degree_right = 1
-    end_degree_right = 30
+    start_degree_right = 31
+    end_degree_right = 60
     left_distance = 0.0
     right_distance = 0.0
-    # pub_ridar_left = rospy.Publisher('ridar_data_left',Float64, queue_size=1)
-    # pub_msg_left = Float64()
-    # pub_ridar_right = rospy.Publisher('ridar_data_right',Float64, queue_size=1)
-    # pub_msg_right = Float64()
+    front_start_left = 300
+    front_end_left = 330
+    front_start_right = 1
+    front_end_right = 30
     ctr_ridar_left = rospy.Publisher('ridar_ctr_left',Bool, queue_size=1)
     pub_ctr_pub_left = Bool()
     ctr_ridar_right = rospy.Publisher('ridar_ctr_right',Bool, queue_size=1)
     pub_ctr_pub_right = Bool()
     ctr_move = rospy.Publisher('ridar_data_check',Bool, queue_size=1)
     pub_ctr_move = Bool()
+    ctr_throttle = rospy.Publisher('throtle_val', Int8, queue_size=2)
+    pub_ctr_throtle = Int8()
     while rospy.is_shutdown:
         try:
             left_min = 10000.0
             right_min = 10000.0
+            front_min = 10000.0
             left_max = 0.0
             right_max = 0.0
+            front_max = 0.0
             degree_list = []
             for i in range (start_degree_left, end_degree_left): # Left Catch
                 if (sen_Lidar.degree_buf[i] > 100.0 and left_min > sen_Lidar.degree_buf[i]):
                     left_min = sen_Lidar.degree_buf[i]
                     sen_Lidar.degree_buf[i] = 10000.0
                 if(left_max < sen_Lidar.degree_buf[i]): left_max = sen_Lidar.degree_buf[i]
+
             for i in range (start_degree_right, end_degree_right): # Right Catch
                 if (sen_Lidar.degree_buf[i] > 100.0 and right_min > sen_Lidar.degree_buf[i]):
                     right_min = sen_Lidar.degree_buf[i]
                     sen_Lidar.degree_buf[i] = 10000.0
                 if(right_max < sen_Lidar.degree_buf[i]): right_max = sen_Lidar.degree_buf[i]
-            
+
+            for i in range (front_start_left, front_end_left): # Right Catch
+                if (sen_Lidar.degree_buf[i] > 100.0 and front_min > sen_Lidar.degree_buf[i]):
+                    front_min = sen_Lidar.degree_buf[i]
+                    sen_Lidar.degree_buf[i] = 10000.0
+                if(front_max < sen_Lidar.degree_buf[i]): front_max = sen_Lidar.degree_buf[i]
+                
+            for i in range (front_start_right, front_end_right): # Right Catch
+                if (sen_Lidar.degree_buf[i] > 100.0 and front_min > sen_Lidar.degree_buf[i]):
+                    front_min = sen_Lidar.degree_buf[i]
+                    sen_Lidar.degree_buf[i] = 10000.0
+                if(front_max < sen_Lidar.degree_buf[i]): front_max = sen_Lidar.degree_buf[i]
+
+
             if (left_min < 1500):
                 pub_ctr_pub_left.data = True
                 # pub_ctr_move = True
@@ -100,21 +114,25 @@ if __name__ == '__main__':
                 pub_ctr_move.data = True
             else : pub_ctr_move.data = False
             
+            if (front_min < 1000.0):
+                throtle = 0.0
+                isbreak = True
+            elif (front_min < 2000.0):
+                throtle = 10.0
+            elif (front_min < 3000.0):
+                throtle = 20.0
+            elif (front_min < 4000.0):
+                throtle = 30.0
+            elif (front_min < 5000.0):
+                throtle = 40.0
+            else:
+                throtle = 50.0
             
+            pub_ctr_throtle.data = int(throtle)
+            ctr_throttle.publish(pub_ctr_throtle)
             ctr_ridar_left.publish(pub_ctr_pub_left)
             ctr_ridar_right.publish(pub_ctr_pub_right)
             ctr_move.publish(pub_ctr_move)
-            # print("left_distance : ",left_min, left_max)
-            # print("right_distance : ",right_min, right_max)
-            # print("left : ",pub_ctr_pub_left.data)
-            # print("right : ",pub_ctr_pub_right.data)
-            # print("stop : ",pub_ctr_move.data)
-
-            # pub_msg_left.data = left_min => lidar data
-            # pub_ridar_left.publish(pub_msg_left)
-            # pub_msg_right.data = right_min
-            # pub_ridar_right.publish(pub_msg_right)
-            
 
             time.sleep(0.2)
         except KeyboardInterrupt:
