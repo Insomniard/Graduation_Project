@@ -91,15 +91,15 @@ if __name__ == '__main__':
 
             for i in range (front_start_left, front_end_left): # Right Catch
                 if (sen_Lidar.degree_buf[i] > 100.0 and front_min > sen_Lidar.degree_buf[i]):
-                    front_min = sen_Lidar.degree_buf[i]
+                    front_distance_max = sen_Lidar.degree_buf[i]
                     sen_Lidar.degree_buf[i] = 10000.0
-                if(front_max < sen_Lidar.degree_buf[i]): front_max = sen_Lidar.degree_buf[i]
+                if(front_max > sen_Lidar.degree_buf[i]): front_max = sen_Lidar.degree_buf[i]
                 
             for i in range (front_start_right, front_end_right): # Right Catch
                 if (sen_Lidar.degree_buf[i] > 100.0 and front_min > sen_Lidar.degree_buf[i]):
-                    front_min = sen_Lidar.degree_buf[i]
+                    front_distance_max = sen_Lidar.degree_buf[i]
                     sen_Lidar.degree_buf[i] = 10000.0
-                if(front_max < sen_Lidar.degree_buf[i]): front_max = sen_Lidar.degree_buf[i]
+                if(front_max > sen_Lidar.degree_buf[i]): front_max = sen_Lidar.degree_buf[i]
 
 
             if (left_min < 1500):
@@ -114,16 +114,16 @@ if __name__ == '__main__':
                 pub_ctr_move.data = True
             else : pub_ctr_move.data = False
             
-            if (front_min < 1000.0):
+            if (front_distance_max < 1000.0):
                 throtle = 0.0
                 isbreak = True
-            elif (front_min < 2000.0):
+            elif (front_distance_max < 2000.0):
                 throtle = 10.0
-            elif (front_min < 3000.0):
+            elif (front_distance_max < 3000.0):
                 throtle = 20.0
-            elif (front_min < 4000.0):
+            elif (front_distance_max < 4000.0):
                 throtle = 30.0
-            elif (front_min < 5000.0):
+            elif (front_distance_max < 5000.0):
                 throtle = 40.0
             else:
                 throtle = 50.0
