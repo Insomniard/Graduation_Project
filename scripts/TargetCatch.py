@@ -1,190 +1,171 @@
-#!/usr/bin/env python3
-from logging import fatal
-from numpy.core.fromnumeric import swapaxes
-import rospy, cv2, sys
+#!/usr/bin/python3
+import rospy
+import cv2 as cv
 import numpy as np
-from sensor_msgs.msg import NavSatFix
-from sensor_msgs.msg import CompressedImage
-from sensor_msgs.msg import LaserScan
-from std_msgs.msg import String
-from cardrv_use_example_jeong import cardrv_control_example
-from TargetCahch import targetcatch
-from std_msgs.msg import Int8 , Bool
-
-
-
-#  self.Cset_aimode = 2 # 0:OFF, 1:JustSteer, 2:CarPairToPCReady, 3:ForceControl(Warnning)
-#         self.Cset_drvmode = 0 # 0:Normal, 1:Forward, 2:Reverse, 3:break
-#         self.Cset_throttle = 0 # 0~99 throttle level
-#         self.Cset_steer_degree = 90 # 0~180 steer degree mode set (180 upper is off)
-#         self.Cset_signal = 3 # 0:signal OFF, 1:left signal lamp on, 2:right signal lamp on, 3:both signal lamp on
-#         self.Cset_lamp = 0 # 0:lamp off, 1:lamp on
-#         self.Cset_horn = 0 # 0:horn off, 1:horn on
-
-class my_script_run:
-    
+import time, threading
+from std_msgs.msg import Int8
+class targetcatch:
     def __init__(self):
-        self.steer_degree_plma = 50
-        rospy.init_node('letsgetit', anonymous=True)
-        self.carDrv         = cardrv_control_example("gilbot_client", False) #driver code confusion.. import for simple coding.
-       # self.cam_sub_0      = rospy.Subscriber("/camera0/compressed", CompressedImage, self.callback_cam0) #read for cam0 image.
-        # self.gps_sub_utm    = rospy.Subscriber("/gps_node/get_UTM", NavSatFix, self.callback_utm)
-        # self.gps_sub_time   = rospy.Subscriber("/gps_node/get_time", String, self.callback_time)
-        # self.gps_sub_speed  = rospy.Subscriber("/gps_node/get_speed", String, self.callback_speed)
-        # self.lidar_sub      = rospy.Subscriber("/scan", LaserScan, self.callback_laser) 
-        # gilbot_control_cli
-        self.img_bgr_0 = None
-        rospy.Subscriber('ridar_ctr_left',Bool,self.callback_lidar_left)
-        rospy.Subscriber('ridar_ctr_right',Bool,self.callback_lidar_right)
-        rospy.Subscriber('ridar_data_check',Bool,self.callback_lidar_stop)
+        rospy.init_node('targetcatcher', anonymous=True)
 
-        rospy.Subscriber('/handler_point',Int8,self.cb)
-        rospy.Subscriber('/throtle_val',Int8,self.throttle_callback)
-        self.pub_steer = rospy.Publisher('/value/steer_degree', String, queue_size=3)
-        self.left_point = Bool()
-        self.right_point = Bool()
-        self.stop_point = Bool()
-        self.hander_point = Int8()
-        self.throttle_value = Int8()
-        self.is_cb = False
+        self.pub = rospy.Publisher('/handler_point',Int8, queue_size=1)
+        self.pub_msg = Int8()
+        self.hander_point = 0
+        self.hsv = 0
+        self.lower_blue1 = 0
+        self.upper_blue1 = 0
+        self.lower_blue2 = 0
+        self.upper_blue2 = 0
+        self.lower_blue3 = 0
+        self.upper_blue3 = 0
+        self.tracking = 60
+        cv.namedWindow('img_color')
+        cv.setMouseCallback('img_color', self.mouse_callback)
+        self.cap = cv.VideoCapture(0)
+        self.check_point = False
+        self.horn_point = False
+        fuckU = threading.Thread(target=self.Controlltarget)
+        fuckU.start()
+
+
+    def get_hander_point(self):
+        return self.hander_point
+
+    def mouse_callback(self, event, x, y, flags, param):
         
-        self.rate = rospy.Rate(20) #car drv control rate hz (0.05s)
-        self.Cset_aimode = 2
-        ## 1 : 왼쪽헨들 2: 우짝헨들 3(A):빵빵   4(B): 우짝깜빡이 5(X): 좌짝깜빡이 6(Y): 램프 7(LT): 속도2배
-        #front distance check + front throttle
-        while not rospy.is_shutdown():
-            # print(self.left_point.data,self.right_point.data,self.stop_point.data)
-            if self.left_point.data == False and self.right_point.data == False and self.stop_point.data == False:
-                self.is_cb = True
-            else : self.is_cb = False
-            # print("cb : ", self.is_cb)
+        ret, img_color=self.cap.read()
+        self.hsv, self.lower_blue1, self.upper_blue1, self.lower_blue2, self.upper_blue2, self.lower_blue3, self.upper_blue3
+        # 마우스 왼쪽 버튼 누를시 위치에 있는 픽셀값을 읽어와서 HSV로 변환합니다.
+    
+        if event == cv.EVENT_LBUTTONDOWN:
+            print(img_color[y, x])
+            color = img_color[y, x]
+            one_pixel = np.uint8([[color]])
+            self.hsv = cv.cvtColor(one_pixel, cv.COLOR_BGR2HSV)
+            self.hsv = self.hsv[0][0]
 
-            if self.is_cb:
-                self.carDrv.Cset_drvmode = 1
-                self.carDrv.Cset_throttle = self.throttle_value
-                # print("Tq",self.hander_point.data)
-                if self.hander_point.data ==1:
-                    self.carDrv.Cset_steer_degree = 145
-                    self.Cset_steer_raw=9999
-                elif self.hander_point.data == 2:
-                    self.carDrv.Cset_steer_degree =  1
-                    # self.Cset_steer_raw=9999
-                
-                elif self.hander_point.data ==0:
-                    self.carDrv.Cset_steer_degree=65
-                else:
-                    self.is_cb = False
-                    self.carDrv.Cset_throttle = 0
-                    self.carDrv.Cset_drvmode=3
-                # print(self.carDrv.Cset_steer_degree)
-                self.pub_steer.publish(str(self.carDrv.Cset_steer_degree))
-                self.carDrv.Cset_active()
-
+            # HSV 색공간에서 마우스 클릭으로 얻은 픽셀값과 유사한 필셀값의 범위를 정합니다.
+            if self.hsv[0] < 10:
+                print("case1")
+                self.lower_blue1 = np.array([self.hsv[0] - 10 + 180, self.tracking, self.tracking])
+                self.upper_blue1 = np.array([180, 255, 255])
+                self.lower_blue2 = np.array([0, self.tracking, self.tracking])
+                self.upper_blue2 = np.array([self.hsv[0], 255, 255])
+                self.lower_blue3 = np.array([self.hsv[0], self.tracking, self.tracking])
+                self.upper_blue3 = np.array([self.hsv[0] + 10, 255, 255])
+                #     print(i-10+180, 180, 0, i)
+                #     print(i, i+10)
+            elif self.hsv[0] > 170:
+                print("case2")
+                self.lower_blue1 = np.array([self.hsv[0], self.tracking, self.tracking])
+                self.upper_blue1 = np.array([180, 255, 255])
+                self.lower_blue2 = np.array([0, self.tracking, self.tracking])
+                self.upper_blue2 = np.array([self.hsv[0] + 10 - 180, 255, 255])
+                self.lower_blue3 = np.array([self.hsv[0] - 10, self.tracking, self.tracking])
+                self.upper_blue3 = np.array([self.hsv[0], 255, 255])
+                #     print(i, 180, 0, i+10-180)
+                #     print(i-10, i)
             else:
+                print("case3")
+                self.lower_blue1 = np.array([self.hsv[0], self.tracking, self.tracking])
+                self.upper_blue1 = np.array([self.hsv[0] + 10, 255, 255])
+                self.lower_blue2 = np.array([self.hsv[0] - 10, self.tracking, self.tracking])
+                self.upper_blue2 = np.array([self.hsv[0], 255, 255])
+                self.lower_blue3 = np.array([self.hsv[0] - 10, self.tracking, self.tracking])
+                self.upper_blue3 = np.array([self.hsv[0], 255, 255])
+                #     print(i, i+10)
+                #     print(i-10, i)
 
-                if self.left_point.data == True:
+            print(self.hsv[0])
+            print("@1", self.lower_blue1, "~", self.upper_blue1)
+            print("@2", self.lower_blue2, "~", self.upper_blue2)
+            print("@3", self.lower_blue3, "~", self.upper_blue3)
 
-                    self.carDrv.Cset_drvmode = 1
-                    self.carDrv.Cset_throttle = self.throttle_value
-                    self.carDrv.Cset_steer_degree =  1
-                elif self.right_point.data == True:
 
-                    self.carDrv.Cset_drvmode = 1
-                    self.carDrv.Cset_throttle = self.throttle_value
-                    self.carDrv.Cset_steer_degree = 145
-                elif self.left_point.data == True and self.right_point.data == True and self.stop_point.data == True:
-                    self.is_cb = False
-                    self.carDrv.Cset_throttle = self.throttle_value
-                    self.carDrv.Cset_drvmode=3
-                else : self.carDrv.Cset_steer_degree= 65 # 75degree
-            
-            if self.is_cb == False and self.stop_point.data == True:
-                    self.carDrv.Cset_throttle = 0
-                    self.carDrv.Cset_drvmode=3
+    def Controlltarget(self):
+        
+        while True:
+            ret, img_color = self.cap.read()
+            # ret, frame = cap.read()
+            if ret:
+                        
+                cv.rectangle(img_color, (140, 40), (485, 450), (0, 0, 255), 5)
+                # img_color = cv.imread('2.jpg')
+                height, width = img_color.shape[:2]
+                img_color = cv.resize(img_color, (width, height), interpolation=cv.INTER_AREA)
 
-            self.carDrv.Cset_active()
-            self.rate.sleep()
+                # 원본 영상을 HSV 영상으로 변환합니다.
+                img_hsv = cv.cvtColor(img_color, cv.COLOR_BGR2HSV)
+
+                # 범위 값으로 HSV 이미지에서 마스크를 생성합니다.
+                img_mask1 = cv.inRange(img_hsv, self.lower_blue1, self.upper_blue1)
+                img_mask2 = cv.inRange(img_hsv, self.lower_blue2, self.upper_blue2)
+                img_mask3 = cv.inRange(img_hsv, self.lower_blue3, self. upper_blue3)
+                img_mask = img_mask1 | img_mask2 | img_mask3
+
+                kerner = np.ones((11, 11), np.uint8)
+                img_mask = cv.morphologyEx(img_mask, cv.MORPH_OPEN, kerner)
+                img_mask = cv.morphologyEx(img_mask, cv.MORPH_CLOSE, kerner)
+
+                numofLabels, img_label, stats, centroids = cv.connectedComponentsWithStats(img_mask)
+                temp = []
+                # stats[:2] -> 좌표값
+                for idx, centroids in enumerate(centroids):
+                    if stats[idx][0] == 0 and stats[idx][1] == 0:
+                        continue
+                    if np.any(np.isnan(centroids)):
+                        continue
+                    x, y, width, height, area = stats[idx]
+                    centerX, centerY = int(centroids[0]), int(centroids[1])
+                    # stats의 맨 마지막값이 면적 (area) -> 이 값 활용하여 특정객체 인식
+                    # temp = list(int(area))
+                    # for i in range(0, 100):
+                    #     temp.append(area)
+                    # areamax = max(temp)
+                    # if areamax:
+                    
+                    if centerX > 140 and centerX < 485 and centerY > 40 and centerY < 450:
+                        check_point = True
+                        self.hander_point = 0
+                        horn_point = False
+                        # print("catch target")
+                    elif centerX < 140 and centerX>20:
+                        # print("Left Missing")
+                        self.hander_point = 1
+                    elif centerX > 485 and centerX < 620:
+                        self.hander_point = 2
+                        # print("Right Missing")
+                    else:
+                        check_point = False
+                        # print("Missing target")
+                        horn_point = True
+                        self.hander_point = 4
+                    
+                    self.pub_msg.data = self.hander_point
+                    self.pub.publish(self.pub_msg)
+                    # print(area)
+                    # print("=========")
+                    # print(centerX)
+                    # print(centerY)
+                    # print("==========")
+                    # if temp(max)==area:
+                   # print("camera h : ",self.hander_point)
+                # 마스크 이미지로 원본 이미지에서 범위값에 해당되는 영상 부분을 획득합니다.
+                img_result = cv.bitwise_and(img_color, img_color, mask=img_mask)
+                cv.imshow('img_color', img_color)
+                # cv.imshow('img_mask', img_mask)
+                cv.imshow('img_result', img_result)
                 
-            #print("handle h : ",self.hander_point.data)
-                                # if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>1000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<5000:
-                #     self.carDrv.Cset_steer_degree = 105
-                #     self.Cset_steer_raw = 9999
-                # if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>5000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<10000:
-                #     self.carDrv.Cset_steer_degree = 120
-                #     self.Cset_steer_raw = 9999
-                # if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>10000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<15000:
-                #     self.carDrv.Cset_steer_degree = 135
-                #     self.Cset_steer_raw = 9999
-                # if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>15000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<20000:
-                #     self.carDrv.Cset_steer_degree = 150
-                #     self.Cset_steer_raw = 9999
-                # if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>20000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<25000:
-                #     self.carDrv.Cset_steer_degree = 175
-                #     self.Cset_steer_raw = 9999
-                # if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>25000:
-                #     self.carDrv.Cset_steer_degree = 180
-                #     self.Cset_steer_raw = 9999
 
+            # ESC 키누르면 종료
+                if cv.waitKey(1) & 0xFF == 27:
+                    
+                    break
+                
+        cv.destroyAllWindows()
 
-            # if self.joystick.getKey_RIGHT_STICK_LEFTRIGHT>0:
-            #     if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>1000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<5000:
-            #         self.carDrv.Cset_steer_degree = 75
-            #         self.Cset_steer_raw = 9999
-            #     if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>5000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<10000:
-            #         self.carDrv.Cset_steer_degree = 60
-            #         self.Cset_steer_raw = 9999
-            #     if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>10000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<15000:
-            #         self.carDrv.Cset_steer_degree = 45
-            #         self.Cset_steer_raw = 9999
-            #     if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>15000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<20000:
-            #         self.carDrv.Cset_steer_degree = 30
-            #         self.Cset_steer_raw = 9999
-            #     if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>20000 and abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT/180))<25000:
-            #         self.carDrv.Cset_steer_degree = 15
-            #         self.Cset_steer_raw = 9999
-            #     if abs(int(self.joystick.getKey_RIGHT_STICK_LEFTRIGHT))>25000:
-            #         self.carDrv.Cset_steer_degree = 0
-            #         self.Cset_steer_raw = 9999
-                   
-    def throttle_callback(self, data):
-        self.throttle_value = data.data
-        print(self.throttle_value)
-    def cb(self, data):
-        self.hander_point.data = data.data
-    def callback_lidar_left(self,data):
-        self.left_point.data = data.data
-    def callback_lidar_right(self,data):
-        self.right_point.data = data.data
-    def callback_lidar_stop(self,data):
-        self.stop_point.data = data.data
-
-
-    def callback_cam0(self, msg):
-        np_arr = np.fromstring(msg.data, np.uint8)
-        self.img_bgr_0 = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        cv2.imshow('IOELECTRON subscriber image test', self.img_bgr_0)
-        cv2.waitKey(1)
     
-    def callback_utm(self, msg):
-
-        print("STAMP: %s"%(str(msg.header.stamp)))
-        print("LATI: %s"%(str(msg.latitude)))
-        print("LONG: %s"%(str(msg.longitude)))
-
-    def callback_time(self, msg):
-        print("TIME: %s"%(str(msg.data)))
     
-    def callback_speed(self, msg):
-        print("SPD: %skm/h"%(str(msg.data)))
-
-    def callback_laser(self, msg):
-        # print("LASER: %s"%(str(msg.data)))
-        pass
 
 if __name__=='__main__':
-    control_main = None
-    try:
-        control_main = my_script_run()
-    except rospy.ROSInterruptException:
-        control_main.carDrv.demo_thread_run = False
-        pass
+    targetcatch()
