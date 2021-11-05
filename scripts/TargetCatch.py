@@ -92,37 +92,38 @@ class targetcatch:
                 img_mask2 = cv.inRange(img_hsv, self.lower_blue2, self.upper_blue2)
                 img_mask3 = cv.inRange(img_hsv, self.lower_blue3, self. upper_blue3)
                 img_mask = img_mask1 | img_mask2 | img_mask3
-
+                
                 kerner = np.ones((11, 11), np.uint8)
                 img_mask = cv.morphologyEx(img_mask, cv.MORPH_OPEN, kerner)
                 img_mask = cv.morphologyEx(img_mask, cv.MORPH_CLOSE, kerner)
-
+                
                 numofLabels, img_label, stats, centroids = cv.connectedComponentsWithStats(img_mask)
                 temp = []
-                # stats[:2] -> 좌표값
-                for idx, centroids in enumerate(centroids):
-                    if stats[idx][0] == 0 and stats[idx][1] == 0:
+                # stats[:2] -> 좌표값 , stats[:4] -> area
+                if stats[:4] > 800:
+                        for idx, centroids in enumerate(centroids):
+                        if stats[idx][0] == 0 and stats[idx][1] == 0:
+                            continue
+                        if np.any(np.isnan(centroids)):
                         continue
-                    if np.any(np.isnan(centroids)):
-                        continue
-                    x, y, width, height, area = stats[idx]
-                    centerX, centerY = int(centroids[0]), int(centroids[1])
+                        x, y, width, height, area = stats[idx]
+                        centerX, centerY = int(centroids[0]), int(centroids[1])
                     
-                    if centerX > 140 and centerX < 485 and centerY > 40 and centerY < 450:
-                        check_point = True
-                        self.hander_point = 0
-                        horn_point = False
-                    elif centerX < 140 and centerX>20:
-                        self.hander_point = 1
-                    elif centerX > 485 and centerX < 620:
-                        self.hander_point = 2
-                    else:
-                        check_point = False
-                        horn_point = True
-                        self.hander_point = 4
+                        if centerX > 140 and centerX < 485 and centerY > 40 and centerY < 450:
+                            check_point = True
+                            self.hander_point = 0
+                            horn_point = False
+                        elif centerX < 140 and centerX>20:
+                            self.hander_point = 1
+                        elif centerX > 485 and centerX < 620:
+                            self.hander_point = 2
+                        else:
+                            check_point = False
+                            horn_point = True
+                            self.hander_point = 4
                     
-                    self.pub_msg.data = self.hander_point
-                    self.pub.publish(self.pub_msg)
+                        self.pub_msg.data = self.hander_point
+                        self.pub.publish(self.pub_msg)
                 # 마스크 이미지로 원본 이미지에서 범위값에 해당되는 영상 부분을 획득합니다.
                 img_result = cv.bitwise_and(img_color, img_color, mask=img_mask)
                 cv.imshow('img_color', img_color)
@@ -138,3 +139,4 @@ class targetcatch:
     
 if __name__=='__main__':
     targetcatch()
+    
